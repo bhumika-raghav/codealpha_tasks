@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TaskFlow - Project</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar" id="navbar"></div>
+  <div class="container wide">
+    <div class="board-header">
+      <div>
+        <h1 id="projectName">Loading...</h1>
+        <div class="desc" id="projectDesc"></div>
+        <div class="members-row" id="membersRow"></div>
+      </div>
+      <div class="board-actions">
+        <button class="secondary" id="addMemberBtn">+ Invite</button>
+        <button class="primary" id="addTaskBtn" style="width:auto;">+ New Task</button>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <div class="column" data-status="todo">
+        <div class="column-header">
+          <div class="column-title"><span class="dot" style="background:#b2bec3;"></span>To Do</div>
+          <span class="column-count" id="count-todo">0</span>
+        </div>
+        <div class="column-body" id="col-todo"></div>
+      </div>
+      <div class="column" data-status="in_progress">
+        <div class="column-header">
+          <div class="column-title"><span class="dot" style="background:#fdcb6e;"></span>In Progress</div>
+          <span class="column-count" id="count-in_progress">0</span>
+        </div>
+        <div class="column-body" id="col-in_progress"></div>
+      </div>
+      <div class="column" data-status="done">
+        <div class="column-header">
+          <div class="column-title"><span class="dot" style="background:#00b894;"></span>Done</div>
+          <span class="column-count" id="count-done">0</span>
+        </div>
+        <div class="column-body" id="col-done"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Task Modal -->
+  <div class="modal-overlay" id="newTaskModal">
+    <div class="modal">
+      <h2>New Task</h2>
+      <div class="error" id="taskModalError"></div>
+      <input id="taskTitle" placeholder="Task title">
+      <textarea id="taskDesc" placeholder="Description (optional)" rows="3"></textarea>
+      <label style="font-size:12px;color:#767b91;">Assignee</label>
+      <select id="taskAssignee"><option value="">Unassigned</option></select>
+      <label style="font-size:12px;color:#767b91;">Due date</label>
+      <input id="taskDue" type="date">
+      <div class="modal-actions">
+        <button class="secondary" id="cancelTaskBtn">Cancel</button>
+        <button class="primary" id="createTaskBtn" style="width:auto;">Create Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite Member Modal -->
+  <div class="modal-overlay" id="inviteModal">
+    <div class="modal">
+      <h2>Invite Member</h2>
+      <div class="error" id="inviteModalError"></div>
+      <input id="inviteUsername" placeholder="Username">
+      <div class="modal-actions">
+        <button class="secondary" id="cancelInviteBtn">Cancel</button>
+        <button class="primary" id="sendInviteBtn" style="width:auto;">Invite</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Detail Modal -->
+  <div class="modal-overlay" id="taskDetailModal">
+    <div class="modal" style="width:480px;">
+      <h2 id="detailTitle"></h2>
+      <div class="error" id="detailError"></div>
+      <div class="task-meta-row">
+        <div style="flex:1;">
+          <label>Status</label>
+          <select id="detailStatus">
+            <option value="todo">To Do</option>
+            <option value="in_progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label>Assignee</label>
+          <select id="detailAssignee"><option value="">Unassigned</option></select>
+        </div>
+      </div>
+      <textarea id="detailDesc" rows="3" placeholder="Description"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <button class="secondary" id="saveDetailBtn">Save Changes</button>
+        <button class="secondary" id="deleteTaskBtn" style="color:#e17055;">Delete Task</button>
+      </div>
+      <hr style="border:none;border-top:1px solid #e6e8ec;margin:14px 0;">
+      <h4 style="margin:0 0 8px;">Comments</h4>
+      <div class="comment-list" id="detailComments"></div>
+      <div class="comment-form">
+        <input type="text" id="detailCommentInput" placeholder="Write a comment...">
+        <button class="primary" id="sendDetailCommentBtn">Send</button>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" id="closeDetailBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get('id');
+    let ME = null;
+    let MEMBERS = [];
+    let currentTaskId = null;
+
+    (async () => {
+      ME = await renderNavbar('project');
+      if (!ME) return;
+      await loadProject();
+      await loadTasks();
+      setupSocket();
+    })();
+
+    async function loadProject() {
+      const { project, members } = await api('GET', `/api/projects/${projectId}`);
+      MEMBERS = members;
+      document.getElementById('projectName').textContent = project.name;
+      document.getElementById('projectDesc').textContent = project.description || '';
+      document.getElementById('membersRow').innerHTML = members.map(m => `
+        <span class="member-chip">
+          <span class="avatar tiny" style="background:${m.avatar_color}">${initials(m.display_name)}</span>
+          ${escapeHtml(m.display_name)}${m.role === 'owner' ? ' 👑' : ''}
+        </span>
+      `).join('');
+
+      const assigneeSelects = [document.getElementById('taskAssignee'), document.getElementById('detailAssignee')];
+      assigneeSelects.forEach(sel => {
+        sel.innerHTML = '<option value="">Unassigned</option>' +
+          members.map(m => `<option value="${m.id}">${escapeHtml(m.display_name)}</option>`).join('');
+      });
+    }
+
+    async function loadTasks() {
+      const { tasks } = await api('GET', `/api/projects/${projectId}/tasks`);
+      ['todo', 'in_progress', 'done'].forEach(status => {
+        const col = document.getElementById(`col-${status}`);
+        const filtered = tasks.filter(t => t.status === status);
+        document.getElementById(`count-${status}`).textContent = filtered.length;
+        col.innerHTML = filtered.map(renderTaskCard).join('');
+      });
+      attachTaskCardHandlers();
+    }
+
+    function renderTaskCard(t) {
+      const due = t.due_date ? `📅 ${t.due_date}` : '';
+      return `
+        <div class="task-card status-${t.status}" draggable="true" data-id="${t.id}">
+          <h4>${escapeHtml(t.title)}</h4>
+          ${t.description ? `<div class="task-desc">${escapeHtml(t.description.slice(0, 80))}</div>` : ''}
+          <div class="task-footer">
+            <span>${due} ${t.commentCount ? `💬 ${t.commentCount}` : ''}</span>
+            ${t.assignee_id ? `<span class="assignee"><span class="avatar tiny" style="background:${t.assignee_color}">${initials(t.assignee_name)}</span></span>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function attachTaskCardHandlers() {
+      document.querySelectorAll('.task-card').forEach(card => {
+        card.addEventListener('click', () => openTaskDetail(card.dataset.id));
+        card.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', card.dataset.id);
+          setTimeout(() => card.style.opacity = '0.4', 0);
+        });
+        card.addEventListener('dragend', () => card.style.opacity = '1');
+      });
+    }
+
+    document.querySelectorAll('.column').forEach(col => {
+      col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
+      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+      col.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        const taskId = e.dataTransfer.getData('text/plain');
+        const newStatus = col.dataset.status;
+        await api('PUT', `/api/tasks/${taskId}`, { status: newStatus });
+        await loadTasks();
+      });
+    });
+
+    // New task modal
+    const newTaskModal = document.getElementById('newTaskModal');
+    document.getElementById('addTaskBtn').onclick = () => newTaskModal.classList.add('open');
+    document.getElementById('cancelTaskBtn').onclick = () => newTaskModal.classList.remove('open');
+    document.getElementById('createTaskBtn').onclick = async () => {
+      const title = document.getElementById('taskTitle').value.trim();
+      const description = document.getElementById('taskDesc').value.trim();
+      const assignee_id = document.getElementById('taskAssignee').value || null;
+      const due_date = document.getElementById('taskDue').value || null;
+      if (!title) { document.getElementById('taskModalError').textContent = 'Title required'; return; }
+      try {
+        await api('POST', `/api/projects/${projectId}/tasks`, { title, description, assignee_id, due_date });
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('taskDesc').value = '';
+        document.getElementById('taskDue').value = '';
+        newTaskModal.classList.remove('open');
+        await loadTasks();
+      } catch (e) {
+        document.getElementById('taskModalError').textContent = e.message;
+      }
+    };
+
+    // Invite modal
+    const inviteModal = document.getElementById('inviteModal');
+    document.getElementById('addMemberBtn').onclick = () => inviteModal.classList.add('open');
+    document.getElementById('cancelInviteBtn').onclick = () => inviteModal.classList.remove('open');
+    document.getElementById('sendInviteBtn').onclick = async () => {
+      const username = document.getElementById('inviteUsername').value.trim();
+      if (!username) return;
+      try {
+        await api('POST', `/api/projects/${projectId}/members`, { username });
+        document.getElementById('inviteUsername').value = '';
+        inviteModal.classList.remove('open');
+        await loadProject();
+      } catch (e) {
+        document.getElementById('inviteModalError').textContent = e.message;
+      }
+    };
+
+    // Task detail modal
+    async function openTaskDetail(taskId) {
+      currentTaskId = taskId;
+      const { tasks } = await api('GET', `/api/projects/${projectId}/tasks`);
+      const task = tasks.find(t => String(t.id) === String(taskId));
+      if (!task) return;
+      document.getElementById('detailTitle').textContent = task.title;
+      document.getElementById('detailStatus').value = task.status;
+      document.getElementById('detailAssignee').value = task.assignee_id || '';
+      document.getElementById('detailDesc').value = task.description || '';
+      document.getElementById('detailError').textContent = '';
+      await loadDetailComments(taskId);
+      document.getElementById('taskDetailModal').classList.add('open');
+    }
+
+    document.getElementById('closeDetailBtn').onclick = () => {
+      document.getElementById('taskDetailModal').classList.remove('open');
+    };
+
+    document.getElementById('saveDetailBtn').onclick = async () => {
+      const status = document.getElementById('detailStatus').value;
+      const assignee_id = document.getElementById('detailAssignee').value || null;
+      const description = document.getElementById('detailDesc').value.trim();
+      try {
+        await api('PUT', `/api/tasks/${currentTaskId}`, { status, assignee_id, description });
+        document.getElementById('taskDetailModal').classList.remove('open');
+        await loadTasks();
+      } catch (e) {
+        document.getElementById('detailError').textContent = e.message;
+      }
+    };
+
+    document.getElementById('deleteTaskBtn').onclick = async () => {
+      if (!confirm('Delete this task?')) return;
+      await api('DELETE', `/api/tasks/${currentTaskId}`);
+      document.getElementById('taskDetailModal').classList.remove('open');
+      await loadTasks();
+    };
+
+    async function loadDetailComments(taskId) {
+      const { comments } = await api('GET', `/api/tasks/${taskId}/comments`);
+      document.getElementById('detailComments').innerHTML = comments.map(c => `
+        <div class="comment">
+          <div class="avatar tiny" style="background:${c.avatar_color}">${initials(c.display_name)}</div>
+          <div class="bubble"><span class="cname">${escapeHtml(c.display_name)}</span>${escapeHtml(c.content)}</div>
+        </div>
+      `).join('') || '<div style="color:#999;font-size:13px;">No comments yet.</div>';
+    }
+
+    document.getElementById('sendDetailCommentBtn').onclick = async () => {
+      const input = document.getElementById('detailCommentInput');
+      const content = input.value.trim();
+      if (!content) return;
+      await api('POST', `/api/tasks/${currentTaskId}/comments`, { content });
+      input.value = '';
+      await loadDetailComments(currentTaskId);
+    };
+
+    // Real-time updates via a native WebSocket to Django Channels
+    // (see /ws/project/<id>/ -> core/consumers.py ProjectConsumer)
+    function setupSocket() {
+      connectProjectSocket(projectId, (type) => {
+        if (['task-created', 'task-updated', 'task-deleted'].includes(type)) loadTasks();
+        if (type === 'member-added') loadProject();
+      });
+    }
+  </script>
+</body>
+</html>

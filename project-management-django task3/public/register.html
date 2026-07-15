@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TaskFlow - Sign Up</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="auth-card">
+    <h1>Join TaskFlow</h1>
+    <div class="error" id="error"></div>
+    <input id="displayName" placeholder="Display name">
+    <input id="username" placeholder="Username" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="new-password">
+    <button class="primary" id="registerBtn">Sign Up</button>
+    <div class="switch">Already have an account? <a href="/index.html">Log in</a></div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script>
+    document.getElementById('registerBtn').onclick = async () => {
+      const display_name = document.getElementById('displayName').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      try {
+        await api('POST', '/api/register', { username, password, display_name });
+        window.location.href = '/dashboard.html';
+      } catch (e) {
+        document.getElementById('error').textContent = e.message;
+      }
+    };
+  </script>
+</body>
+</html>

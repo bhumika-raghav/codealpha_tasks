@@ -1,0 +1,14 @@
+{% extends 'store/base.html' %}
+{% block title %}Login — ShopEasy{% endblock %}
+
+{% block content %}
+<div class="auth-form">
+    <h1>Login</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn">Login</button>
+    </form>
+    <p>Naya account nahi hai? <a href="{% url 'register' %}">Register karein</a></p>
+</div>
+{% endblock %}

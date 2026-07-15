@@ -1,0 +1,48 @@
+{% extends 'store/base.html' %}
+{% block title %}Your Cart — ShopEasy{% endblock %}
+
+{% block content %}
+<h1>Your Cart</h1>
+
+{% if cart|length > 0 %}
+<table class="cart-table">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th>Price</th>
+            <th>Quantity</th>
+            <th>Total</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in cart %}
+        <tr>
+            <td class="cart-product-cell">
+                {% if item.product.image %}
+                    <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="cart-thumb">
+                {% endif %}
+                {{ item.product.name }}
+            </td>
+            <td>₹{{ item.price }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>₹{{ item.total_price }}</td>
+            <td>
+                <form action="{% url 'cart_remove' item.product.id %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="link-button">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="cart-summary">
+    <p>Total: <strong>₹{{ cart.get_total_price }}</strong></p>
+    <a href="{% url 'checkout' %}" class="btn">Proceed to Checkout</a>
+</div>
+{% else %}
+    <p>Aapka cart abhi khaali hai. <a href="{% url 'product_list' %}">Shopping shuru karein</a>.</p>
+{% endif %}
+{% endblock %}

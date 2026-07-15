@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TaskFlow - Projects</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar" id="navbar"></div>
+  <div class="container">
+    <div class="page-header">
+      <h1>Your Projects</h1>
+      <button class="primary" id="newProjectBtn">+ New Project</button>
+    </div>
+    <div class="project-grid" id="projectGrid"></div>
+  </div>
+
+  <div class="modal-overlay" id="newProjectModal">
+    <div class="modal">
+      <h2>Create Project</h2>
+      <div class="error" id="modalError"></div>
+      <input id="projectName" placeholder="Project name">
+      <textarea id="projectDesc" placeholder="Description (optional)" rows="3"></textarea>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelBtn">Cancel</button>
+        <button class="primary" id="createBtn" style="width:auto;">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      await renderNavbar('dashboard');
+      await loadProjects();
+    })();
+
+    async function loadProjects() {
+      const { projects } = await api('GET', '/api/projects');
+      const grid = document.getElementById('projectGrid');
+      if (projects.length === 0) {
+        grid.innerHTML = '<div class="empty">No projects yet. Create your first one!</div>';
+        return;
+      }
+      grid.innerHTML = projects.map(p => `
+        <div class="project-card" onclick="location.href='/project.html?id=${p.id}'">
+          <h3>${escapeHtml(p.name)}</h3>
+          <p>${escapeHtml(p.description || '')}</p>
+          <div class="meta">
+            <span>📋 ${p.taskCount} tasks</span>
+            <span>👥 ${p.memberCount} members</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    const modal = document.getElementById('newProjectModal');
+    document.getElementById('newProjectBtn').onclick = () => modal.classList.add('open');
+    document.getElementById('cancelBtn').onclick = () => modal.classList.remove('open');
+
+    document.getElementById('createBtn').onclick = async () => {
+      const name = document.getElementById('projectName').value.trim();
+      const description = document.getElementById('projectDesc').value.trim();
+      if (!name) {
+        document.getElementById('modalError').textContent = 'Project name is required';
+        return;
+      }
+      try {
+        const { project } = await api('POST', '/api/projects', { name, description });
+        window.location.href = `/project.html?id=${project.id}`;
+      } catch (e) {
+        document.getElementById('modalError').textContent = e.message;
+      }
+    };
+  </script>
+</body>
+</html>

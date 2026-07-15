@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SocialSphere - Feed</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar" id="navbar"></div>
+  <div class="container">
+    <div class="composer">
+      <textarea id="postContent" placeholder="What's on your mind?"></textarea>
+      <div class="composer-footer">
+        <button class="primary" id="postBtn" style="width:auto;padding:8px 20px;">Post</button>
+      </div>
+    </div>
+    <div id="posts"></div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/posts.js"></script>
+  <script>
+    let ME = null;
+    (async () => {
+      ME = await renderNavbar('feed');
+      if (!ME) return;
+      await loadFeed();
+    })();
+
+    document.getElementById('postBtn').onclick = async () => {
+      const content = document.getElementById('postContent').value.trim();
+      if (!content) return;
+      await api('POST', '/api/posts', { content });
+      document.getElementById('postContent').value = '';
+      await loadFeed();
+    };
+
+    async function loadFeed() {
+      const { posts } = await api('GET', '/api/feed');
+      const container = document.getElementById('posts');
+      if (posts.length === 0) {
+        container.innerHTML = '<div class="empty">No posts yet. Follow people on Explore, or write your first post!</div>';
+        return;
+      }
+      container.innerHTML = posts.map(p => renderPost(p, ME)).join('');
+      attachPostHandlers(ME);
+    }
+  </script>
+</body>
+</html>

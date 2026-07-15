@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SocialSphere - Profile</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar" id="navbar"></div>
+  <div class="container">
+    <div class="profile-header" id="profileHeader"></div>
+    <div id="posts"></div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/posts.js"></script>
+  <script>
+    let ME = null;
+    const params = new URLSearchParams(location.search);
+    const profileId = params.get('id');
+
+    (async () => {
+      ME = await renderNavbar('profile');
+      if (!ME) return;
+      await loadProfile();
+      await loadPosts();
+    })();
+
+    async function loadProfile() {
+      const data = await api('GET', `/api/users/${profileId}`);
+      const { user, followerCount, followingCount, postCount, isFollowing, isSelf } = data;
+      document.getElementById('profileHeader').innerHTML = `
+        <div class="avatar" style="background:${user.avatar_color}">${initials(user.display_name)}</div>
+        <h2>${escapeHtml(user.display_name)}</h2>
+        <div class="username">@${escapeHtml(user.username)}</div>
+        <div class="bio">${escapeHtml(user.bio || '')}</div>
+        <div class="stats">
+          <div><b>${postCount}</b><span>Posts</span></div>
+          <div><b>${followerCount}</b><span>Followers</span></div>
+          <div><b>${followingCount}</b><span>Following</span></div>
+        </div>
+        ${isSelf
+          ? `<button class="primary" id="editBtn">Edit Profile</button>`
+          : `<button class="primary" id="followBtn">${isFollowing ? 'Unfollow' : 'Follow'}</button>`}
+      `;
+
+      if (isSelf) {
+        document.getElementById('editBtn').onclick = async () => {
+          const display_name = prompt('Display name:', user.display_name) ?? user.display_name;
+          const bio = prompt('Bio:', user.bio) ?? user.bio;
+          await api('PUT', '/api/users/me', { display_name, bio });
+          await loadProfile();
+        };
+      } else {
+        document.getElementById('followBtn').onclick = async (e) => {
+          if (isFollowing) {
+            await api('POST', `/api/users/${profileId}/unfollow`);
+          } else {
+            await api('POST', `/api/users/${profileId}/follow`);
+          }
+          await loadProfile();
+        };
+      }
+    }
+
+    async function loadPosts() {
+      const { posts } = await api('GET', `/api/users/${profileId}/posts`);
+      document.getElementById('posts').innerHTML =
+        posts.map(p => renderPost(p, ME)).join('') || '<div class="empty">No posts yet.</div>';
+      attachPostHandlers(ME);
+    }
+  </script>
+</body>
+</html>

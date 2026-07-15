@@ -1,0 +1,31 @@
+{% extends 'store/base.html' %}
+{% block title %}My Orders — ShopEasy{% endblock %}
+
+{% block content %}
+<h1>My Orders</h1>
+
+{% if orders %}
+<table class="cart-table">
+    <thead>
+        <tr>
+            <th>Order #</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for order in orders %}
+        <tr>
+            <td>{{ order.id }}</td>
+            <td>{{ order.created_at|date:"d M Y" }}</td>
+            <td>{{ order.get_status_display }}</td>
+            <td>₹{{ order.get_total_cost }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p>Aapne abhi tak koi order nahi kiya hai.</p>
+{% endif %}
+{% endblock %}

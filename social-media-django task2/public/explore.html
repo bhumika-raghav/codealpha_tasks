@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SocialSphere - Explore</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar" id="navbar"></div>
+  <div class="container">
+    <div class="composer">
+      <input id="searchInput" placeholder="Search users by name or username...">
+    </div>
+    <div id="searchResults"></div>
+    <h3 id="feedLabel" style="color:#767b91;">All Posts</h3>
+    <div id="posts"></div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/posts.js"></script>
+  <script>
+    let ME = null;
+    (async () => {
+      ME = await renderNavbar('explore');
+      if (!ME) return;
+      await loadExplorePosts();
+    })();
+
+    async function loadExplorePosts() {
+      const { posts } = await api('GET', '/api/posts/explore');
+      const container = document.getElementById('posts');
+      container.innerHTML = posts.map(p => renderPost(p, ME)).join('') || '<div class="empty">No posts yet.</div>';
+      attachPostHandlers(ME);
+    }
+
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const q = e.target.value.trim();
+      searchTimeout = setTimeout(async () => {
+        const resultsDiv = document.getElementById('searchResults');
+        if (!q) { resultsDiv.innerHTML = ''; return; }
+        const { users } = await api('GET', `/api/users?q=${encodeURIComponent(q)}`);
+        resultsDiv.innerHTML = users.map(u => `
+          <a href="/profile.html?id=${u.id}" style="text-decoration:none;color:inherit;">
+            <div class="user-result">
+              <div class="avatar small" style="background:${u.avatar_color}">${initials(u.display_name)}</div>
+              <div class="names">
+                <div class="display-name">${escapeHtml(u.display_name)}</div>
+                <div class="username">@${escapeHtml(u.username)}</div>
+              </div>
+            </div>
+          </a>
+        `).join('') || '<div class="empty">No users found.</div>';
+      }, 250);
+    });
+  </script>
+</body>
+</html>
